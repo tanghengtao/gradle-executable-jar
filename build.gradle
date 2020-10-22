@@ -1,0 +1,72 @@
+plugins {
+    id 'java'
+}
+
+group 'org.example'
+version = '1.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+}
+ext {
+    manifestVersion = 1.0
+    mainClass = "org.example.App"
+}
+dependencies {
+    compile group: 'org.apache.commons', name: 'commons-compress', version: '1.16.1'
+    testCompile group: 'junit', name: 'junit', version: '4.12'
+}
+
+
+// 第三方jar和项目一起打包到一个jar包中
+task makeOneJar(type: Jar) {
+    //详细信息参考 https://docs.gradle.org/current/dsl/org.gradle.api.tasks.bundling.Jar.html
+    archivesBaseName = project.name//基本的文件名
+    archiveVersion = project.version //版本
+    manifest { //配置jar文件的manifest
+        attributes(
+                "Manifest-Version": project.manifestVersion,
+                'Main-Class': project.mainClass //指定main方法所在的文件
+        )
+    }
+    //打包项目class
+    from('build/classes/java/main')
+    //打包项目资源
+    from('build/resources/main')
+    //打包依赖包
+    from {
+        (configurations.runtimeClasspath).collect {
+            it.isDirectory() ? it : zipTree(it)
+        }
+    }
+}
+makeOneJar.dependsOn(build)
+
+
+//外置 第三方包到libs目录
+task makeLibJar(type: Jar) {
+    //详细信息参考 https://docs.gradle.org/current/dsl/org.gradle.api.tasks.bundling.Jar.html
+    archivesBaseName = project.name//基本的文件名
+    archiveVersion = project.version //版本
+    manifest { //配置jar文件的manifest
+        attributes(
+                "Class-Path": configurations.compile.collect { "lib/${it.name}" }.join(' '), // 第三方jar 路径
+                "Manifest-Version": project.manifestVersion,
+                'Main-Class': project.mainClass //指定main方法所在的文件
+        )
+    }
+    from('build/classes/java/main')
+    from('build/resources/main')
+//    into('lib') { // 将第三方jar放入 jar包中的 lib目录中
+//        from configurations.compile
+//    }
+}
+
+task copyFile(type: Copy) {
+    from {
+        configurations.compile
+    }
+    into 'build/libs/libs/'
+}
+copyFile.dependsOn(build)
+makeLibJar.dependsOn(copyFile, build)
